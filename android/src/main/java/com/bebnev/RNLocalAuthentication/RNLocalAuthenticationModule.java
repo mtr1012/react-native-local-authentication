@@ -112,41 +112,55 @@ public class RNLocalAuthenticationModule extends ReactContextBaseJavaModule {
             return;
         }
 
-        biometricPrompt = new BiometricPrompt((FragmentActivity) getCurrentActivity(),
-                executor, new BiometricPrompt.AuthenticationCallback() {
+        UiThreadUtil.runOnUiThread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            biometricPrompt = new BiometricPrompt((FragmentActivity) getCurrentActivity(),
+                                    executor, new BiometricPrompt.AuthenticationCallback() {
 
-            @Override
-            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
-                super.onAuthenticationError(errorCode, errString);
+                                @Override
+                                public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                                    super.onAuthenticationError(errorCode, errString);
 
-                if (errorCode == ERROR_NEGATIVE_BUTTON && biometricPrompt != null) {
-                    biometricPrompt.cancelAuthentication();
-                    release();
-                } else if (errorCode == ERROR_USER_CANCELED && !fallbackEnabled && biometricPrompt != null ) {
-                    biometricPrompt.cancelAuthentication();
-                    p.resolve(makeAuthorizationResponse(false, BiometricPrompt.ERROR_NEGATIVE_BUTTON));
-                    release();
-                    return;
+                                    if (errorCode == ERROR_NEGATIVE_BUTTON && biometricPrompt != null) {
+                                        biometricPrompt.cancelAuthentication();
+                                        release();
+                                    } else if (errorCode == ERROR_USER_CANCELED && !fallbackEnabled && biometricPrompt != null ) {
+                                        biometricPrompt.cancelAuthentication();
+                                        p.resolve(makeAuthorizationResponse(false, BiometricPrompt.ERROR_NEGATIVE_BUTTON));
+                                        release();
+                                        return;
+                                    }
+
+                                    p.resolve(makeAuthorizationResponse(false, errorCode));
+                                }
+
+                                @Override
+                                public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                                    super.onAuthenticationSucceeded(result);
+
+                                    p.resolve(makeAuthorizationResponse(true, null));
+                                    release();
+                                }
+
+                                @Override
+                                public void onAuthenticationFailed() {
+                                    super.onAuthenticationFailed();
+
+                                    // p.resolve(makeAuthorizationResponse(false, AUTHORIZATION_FAILED));
+                                }
+                            });
+                        } catch (Exception e) {
+                            release();
+                            p.reject("AuthenticationFailed", e);
+                            return;
+                        }
+
+                    }
                 }
-
-                p.resolve(makeAuthorizationResponse(false, errorCode));
-            }
-
-            @Override
-            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
-                super.onAuthenticationSucceeded(result);
-
-                p.resolve(makeAuthorizationResponse(true, null));
-                release();
-            }
-
-            @Override
-            public void onAuthenticationFailed() {
-                super.onAuthenticationFailed();
-
-                // p.resolve(makeAuthorizationResponse(false, AUTHORIZATION_FAILED));
-            }
-        });
+        );
 
         final BiometricPrompt.PromptInfo promptInfo = buildBiometricPrompt(options);
 
